@@ -1,4 +1,5 @@
-﻿^\.github$
+^\.github$
 ^data-raw$
 ^README\.md$
 ^vignettes$
+^data-raw/run_check.*\.log$
