@@ -1,6 +1,9 @@
-﻿in_path <- "C:/Users/user/OneDrive - NHS/Documents/Pairwise70/data"
+﻿# Read-only importer: builds a single multilevel effects table from Cochrane Pairwise .rda files
+in_path <- "C:/Users/user/OneDrive - NHS/Documents/Pairwise70/data"
 out_dir <- file.path("inst","extdata")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+derive_smd <- TRUE  # set FALSE to prefer MD over SMD for continuous outcomes
 
 normalize_names <- function(x) {
   nm <- tolower(gsub("[^a-zA-Z0-9]+","_",names(x)))
@@ -48,6 +51,7 @@ for (f in rda_files) {
 
   for (i in seq_len(nrow(df))) {
     TE <- seTE <- NA_real_; outcome_type <- measure <- NA_character_
+    # Generic summaries: GIV.Mean/SE
     if (!is.null(giv_mean) && !is.na(giv_mean[i]) && !is.null(giv_se) && !is.na(giv_se[i])) {
       TE <- as.numeric(giv_mean[i]); seTE <- as.numeric(giv_se[i]); outcome_type <- "GENSUM"; measure <- "GIV"
     } else if (!is.null(mean_) && !is.na(mean_[i]) && !is.null(ci_lo) && !is.null(ci_hi) &&
@@ -56,17 +60,35 @@ for (f in rda_files) {
       outcome_type <- "GENSUM"; measure <- "GEN_CI"
     } else if (!is.null(exp_cases) && !is.na(exp_cases[i]) && !is.null(exp_n) && !is.na(exp_n[i]) &&
                !is.null(con_cases) && !is.na(con_cases[i]) && !is.null(con_n) && !is.na(con_n[i])) {
+      # Dichotomous: logOR with continuity correction if any zero cells
       a <- as.numeric(exp_cases[i]); b <- as.numeric(exp_n[i]) - a
       c <- as.numeric(con_cases[i]); d <- as.numeric(con_n[i]) - c
       if (!all(is.finite(c(a,b,c,d)))) next
       if (a==0 || b==0 || c==0 || d==0) { a <- a+0.5; b <- b+0.5; c <- c+0.5; d <- d+0.5 }
-      TE <- log((a/b)/(c/d)); seTE <- sqrt(1/a + 1/b + 1/c + 1/d); outcome_type <- "DICH"; measure <- "logOR"
+      TE <- log((a/b)/(c/d)); seTE <- sqrt(1/a + 1/b + 1/c + 1/d)
+      outcome_type <- "DICH"; measure <- "logOR"
     } else if (!is.null(exp_mean) && !is.na(exp_mean[i]) && !is.null(exp_sd) && !is.na(exp_sd[i]) &&
                !is.null(exp_n) && !is.na(exp_n[i]) && !is.null(con_mean) && !is.na(con_mean[i]) &&
                !is.null(con_sd) && !is.na(con_sd[i]) && !is.null(con_n) && !is.na(con_n[i])) {
-      TE <- as.numeric(exp_mean[i]) - as.numeric(con_mean[i])
-      seTE <- sqrt( (as.numeric(exp_sd[i])^2 / as.numeric(exp_n[i])) + (as.numeric(con_sd[i])^2 / as.numeric(con_n[i])) )
-      outcome_type <- "CONT"; measure <- "MD"
+      # Continuous: SMD (Hedges g) or MD
+      me <- as.numeric(exp_mean[i]); mc <- as.numeric(con_mean[i])
+      sde <- as.numeric(exp_sd[i]);   sdc <- as.numeric(con_sd[i])
+      ne <- as.numeric(exp_n[i]);     nc <- as.numeric(con_n[i])
+      if (!all(is.finite(c(me, mc, sde, sdc, ne, nc))) || ne <= 1 || nc <= 1) next
+      if (isTRUE(derive_smd)) {
+        sd_pooled <- sqrt( ((ne - 1) * sde^2 + (nc - 1) * sdc^2) / (ne + nc - 2) )
+        if (!is.finite(sd_pooled) || sd_pooled <= 0) next
+        d <- (me - mc) / sd_pooled
+        J <- 1 - 3 / (4 * (ne + nc) - 9)
+        g <- J * d
+        var_g <- ((ne + nc) / (ne * nc)) + (g^2 / (2 * (ne + nc - 2)))
+        TE <- g; seTE <- sqrt(var_g)
+        outcome_type <- "CONT"; measure <- "SMD"
+      } else {
+        TE <- me - mc
+        seTE <- sqrt( (sde^2 / ne) + (sdc^2 / nc) )
+        outcome_type <- "CONT"; measure <- "MD"
+      }
     } else { next }
 
     if (!is.finite(TE) || !is.finite(seTE) || seTE <= 0) next
@@ -94,6 +116,7 @@ if (!length(rows)) stop("No effects derived.")
 mlm <- do.call(rbind, rows)
 utils::write.csv(mlm, file.path(out_dir, "mlm_effects.csv"), row.names = FALSE)
 cat("Wrote", file.path(out_dir, "mlm_effects.csv"), "\n")
-catg <- aggregate(list(n_effects = mlm), by = list(review_id = mlm, analysis_id = mlm), FUN = length)
+# simple catalogue by review/analysis
+catg <- aggregate(list(n_effects = mlm$TE), by = list(review_id = mlm$review_id, analysis_id = mlm$analysis_id), FUN = length)
 utils::write.csv(catg, file.path(out_dir, "catalogue.csv"), row.names = FALSE)
 cat("Wrote", file.path(out_dir, "catalogue.csv"), "\n")
