@@ -1,0 +1,19 @@
+﻿Package: MLM501
+Title: Cochrane Multilevel Meta-Analysis Effects Table (501 Reviews)
+Version: 0.1.0
+Authors@R:
+    person("Mahmood", "Ahmad", email = "mahmood.ahmad2@nhs.net", role = c("aut","cre"))
+Description: Builds a single multilevel meta-analysis effects table from 500+ Cochrane review datasets. Derives TE and seTE for dichotomous and continuous outcomes, preserves moderators and provenance (DOI and URL), and provides helpers to subset coherent cohorts (e.g., log odds ratios). Importer is read-only against the source repository.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends: R (>= 4.1)
+Imports:
+    utils,
+    stats
+    brms,
+    rstan
+URL: https://github.com/mahmood789/MLM501
+BugReports: https://github.com/mahmood789/MLM501/issues
+
+

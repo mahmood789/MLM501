@@ -1,0 +1,52 @@
+﻿---
+title: "501MLM: Multilevel Effects Table and Examples"
+format: html
+editor: visual
+---
+
+## Overview
+
+This vignette illustrates how to build and use a single, multilevel-ready effects table derived from 500+ Cochrane pairwise datasets.
+
+- Importer (read-only): data-raw/import_cochrane501.R
+- Effects table: inst/extdata/mlm_effects.csv
+- Catalogue: inst/extdata/catalogue.csv
+
+## Load the effects table
+
+`{r}
+library(MLM501)
+df <- read_mlm_effects()
+str(df)
+`
+
+## Select a coherent cohort
+
+`{r}
+# Example: dichotomous log odds-ratio
+cohort <- get_cohort(df, outcome = "DICH", measure = "logOR")
+summary(cohort)
+`
+
+## Frequentist multilevel demo
+
+`{r}
+# Run the demo script to generate a small summary (requires metafor + clubSandwich)
+source("data-raw/examples/mlm_demo.R")
+read.csv("inst/extdata/mlm_demo_results.csv")
+`
+
+## Bayesian multilevel demo (optional)
+
+`{r}
+# Requires brms (and rstan toolchain). If unavailable, the script writes a NOTE.
+source("data-raw/examples/mlm_bayes_demo.R")
+list.files("inst/extdata", pattern = "mlm_bayes_demo_")
+`
+
+## Notes
+
+- Always subset to coherent cohorts (same outcome_type and measure) before fitting.
+- Use random intercepts at eview_id/analysis_id and optionally study_id.
+- For within-study dependence, consider cluster-robust SEs (clubSandwich) or multivariate models.
+
